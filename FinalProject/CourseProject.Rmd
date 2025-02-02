@@ -1,0 +1,179 @@
+---
+title: "R course project"
+author: "Viktoria Ivanova"
+date: "2025-01-28"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+## Central Limit Theorem
+
+Simulation of Central Limit Theorem for large numbers.
+
+```{r}
+central_limit_theorem <- function(i, n, p) {
+  
+  if(i < 1000 || i > 10000 || !is.integer(i)) {
+    stop("Number of iterations must be integer between 1000 and 10000.")
+  }
+  
+  if(n < 90 || n > 900 || n%%2 != 0 || !is.integer(n)) {
+    stop("Size of simulation must be even integer between 90 and 900.")
+  }
+  
+  if(p < 0 || p > 1 || !is.numeric(p)) {
+    stop("Probability should be real number between 0 and 1.")
+  }
+  
+  mu <- (1 - p)/ p
+  sigma <- sqrt((1 - p)/ (p^2))
+  vector_size <- n / 2
+  
+  result_vector <- numeric(i)
+  
+  for(curr_iteration in 1:i) {
+    normal_distribution_vector <- rnorm(vector_size, mu, sigma)
+    geom_distribution_vector <- rgeom(vector_size, p)
+    
+    concatenated_vectors <- c(normal_distribution_vector, geom_distribution_vector)
+    shuffled_vector <- sample(concatenated_vectors)
+    
+    mean_shuffled <- mean(shuffled_vector)
+    result_to_add <- ((mean_shuffled - mu) / sigma) * sqrt(n)
+    
+    result_vector[curr_iteration] <- result_to_add
+  }
+  
+  return(result_vector)
+}
+```
+
+Now, the CLT simulation will be tested with:\
+ -> 3000 iterations\
+ -> 150 size of vector\
+ -> 0.35 probability\
+
+```{r}
+vector_central_limit_theorem <- central_limit_theorem(3000L, 150L, 0.35)
+```
+
+After calling the function, the mean value and the standard deviation can be printed:
+
+```{r}
+mean_res <- mean(vector_central_limit_theorem)
+std_res <- sd(vector_central_limit_theorem)
+```
+
+```{r, echo=FALSE}
+sprintf("Mean: %.10f. Standard deviation: %.10f.", mean_res, std_res) 
+```
+
+And to check that the values follow a normal distribution, we can use q-q plot:
+
+```{r}
+qqnorm(vector_central_limit_theorem, main = "Simulation vector results")
+qqline(vector_central_limit_theorem, col = "red")
+```
+
+Since the points on the graph look aligned on a stright line, we can conclude that the data
+is approximately normally distributed.\
+\
+\
+\
+
+## Training mtcars dataset with linear regression model
+
+Let's include the needed libraries and the mtcars dataset:
+
+library(tidymodels)\
+library(corrplot)\
+data(mtcars)\
+
+```{r, include=FALSE}
+library(tidymodels)
+library(corrplot)
+```
+
+# Dataset analysation
+
+First of all, let's get familiar with the dataset 'mtcars' by making some observations.
+
+```{r mtcars}
+mtcars
+```
+
+```{r}
+dim(mtcars)
+```
+
+```{r}
+summary(mtcars)
+```
+\
+\
+Next, let's analyse the dependence between features by plotting the correlation heatmap of the 
+dataset. It can be spotted that the dependent variables have correlation coefficient closer to {-1, 1} and the independent ones have coefficient close to 0.
+
+```{r}
+cor_matrix <- cor(mtcars)
+corrplot(cor_matrix, method = "color")
+```
+\
+\
+Now, we can step on the data preprocessing and creation of the Linear regression model.
+In the beginning, the data should be splitted with 30 training samples and 2 testing samples.
+This can be done with the initial_split() function:
+
+```{r}
+set.seed(123)
+data_split <- initial_split(mtcars, prop = 30/32)
+train_data <- training(data_split)
+test_data <- testing(data_split)
+```
+\
+\
+With the training data we will instantiate a linear regression model and fit the data into it. 
+```{r}
+linreg <- linear_reg()
+linreg_fit <- linreg %>%
+  fit(mpg ~ wt, data = train_data)
+```
+\
+What family of functions would the fitted model be a member of? - first degree polynomial
+\
+Now we can check the estimated coefficients for fˆ(x) by using the tidy() function:
+```{r}
+tidy(linreg_fit)
+```
+
+The explicit form for fˆ(x) is: f^(wt) = -5.36 * wt + 37.3
+\
+Let's now plot the estimated model on the training dataset:
+```{r}
+ggplot(train_data, aes(x = wt, y = mpg)) +
+  geom_point() +
+  geom_smooth(method = "lm", se = FALSE, color = "red") +
+  labs(title = "Fitted Linear Model", 
+       x = "Weight", 
+       y = "Miles/(US) gallon")
+```
+
+\
+We can now predict the values for mpg on the unseen data - the testing set:
+```{r}
+predictions <- predict(linreg_fit, new_data = test_data)
+predictions
+```
+
+In conclusion, we can check how well the model performs, based on the value of root_mean_squared_error:
+
+```{r}
+rmse_value <- augment(linreg_fit, new_data = test_data) %>%
+          rmse(mpg, .pred)
+rmse_value
+```
+
+Based on the RMSE value, we can assume that the model performs pretty well.
+
